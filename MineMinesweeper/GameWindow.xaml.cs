@@ -15,7 +15,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-
+using Point = MineMinesweeper.Util.Point;
 namespace MineMinesweeper
 {
     /// <summary>
@@ -77,20 +77,19 @@ namespace MineMinesweeper
                 PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private void SetMat(int firstX, int firstY)
+        private void SetMat(Point firstP)
         {
             for (int i = 0; i < this.mines; i++)
             {
-                int rndX = rnd.Next(matWidth);
-                int rndY = rnd.Next(matHeight);
-                if (mineMat[rndY, rndX] != -1 && !(rndX == firstX && rndY == firstY))
+                Point rndP = new Point(rnd.Next(matWidth), rnd.Next(matHeight));
+                if (!HasMine(rndP) && !firstP.Equals(rndP))
                 {
-                    mineMat[rndY, rndX] = -1;
-                    DoAround(rndX, rndY, (aroundY, aroundX) =>
+                    mineMat[rndP.Y, rndP.X] = -1;
+                    DoAround(rndP, (aroundP) =>
                     {
-                        if (mineMat[aroundY, aroundX] != -1)
+                        if (!HasMine(aroundP))
                         {
-                            mineMat[aroundY, aroundX]++;
+                            mineMat[aroundP.Y, aroundP.X]++;
                         }
                     }
                     );
@@ -102,44 +101,52 @@ namespace MineMinesweeper
             }
         }
 
-        private void DoAround(int x, int y, Action<int, int> action)
+        private bool HasMine(Point p)
         {
-            for (int aroundY = y - 1; aroundY < y + 2; aroundY++)
+            return mineMat[p.Y, p.X] == -1;
+        }
+
+        private void DoAround(Point p, Action<Point> action)
+        {
+            Point aroundPoint = new Point(0, 0);
+            for (aroundPoint.Y = p.Y - 1; aroundPoint.Y < p.Y + 2; aroundPoint.Y++)
             {
-                for (int aroundX = x - 1; aroundX < x + 2; aroundX++)
+                for (aroundPoint.X = p.X - 1; aroundPoint.X < p.X + 2; aroundPoint.X++)
                 {
-                    if (InMat(aroundY, aroundX))
+                    if (InMat(aroundPoint))
                     {
-                        if (!(aroundX == x && aroundY == y))
+                        if (!p.Equals(aroundPoint))
                         {
-                            action(aroundY, aroundX);
+                            action(aroundPoint);
                         }
                     }
                 }
             }
         }
 
-        private bool InMat(int y, int x)
+        private IEnumerable<T> ReturnAround<T>(Point p, Func<Point, T> func)
         {
-            return x >= 0 && y >= 0 && x < matWidth && y < matHeight;
-        }
-
-        private IEnumerable<T> ReturnAround<T>(int x, int y, Func<int, int, T> func)
-        {
-            for (int aroundY = y - 1; aroundY < y + 2; aroundY++)
+            Point aroundPoint = new Point(0, 0);
+            for (aroundPoint.Y = p.Y - 1; aroundPoint.Y < p.Y + 2; aroundPoint.Y++)
             {
-                for (int aroundX = x - 1; aroundX < x + 2; aroundX++)
+                for (aroundPoint.X = p.X - 1; aroundPoint.X < p.X + 2; aroundPoint.X++)
                 {
-                    if (InMat(aroundY, aroundX))
+                    if (InMat(aroundPoint))
                     {
-                        if (!(aroundX == x && aroundY == y))
+                        if (!p.Equals(aroundPoint))
                         {
-                            yield return func(aroundY, aroundX);
+                            yield return func(aroundPoint);
                         }
                     }
                 }
             }
         }
+        private bool InMat(Point p)
+        {
+            return p.X >= 0 && p.Y >= 0 && p.X < matWidth && p.Y < matHeight;
+        }
+
+
 
         private void SetWindow()
         {
@@ -168,20 +175,19 @@ namespace MineMinesweeper
         private void B_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             Button b = sender as Button;
-            int y = Grid.GetRow(b);
-            int x = Grid.GetColumn(b);
-            if (revealedMat[y, x])
+            Point p = b.GetLocationInGrid();
+            if (revealedMat[p.Y, p.X])
             {
-                int flagCount = ReturnAround(x, y, (aroundY, aroundX) =>
+                int flagCount = ReturnAround(p, (aroundP) =>
                 {
-                    return hintMat[aroundY, aroundX] == Hint.FLAG;
+                    return hintMat[aroundP.Y, aroundP.X] == Hint.FLAG;
                 }).Count(f => f);
 
-                if (flagCount == mineMat[y, x])
+                if (flagCount == mineMat[p.Y, p.X])
                 {
-                    DoAround(x, y, (aroundY, aroundX) =>
+                    DoAround(p, (aroundP) =>
                     {
-                        RevealTile(buttonMat[aroundY, aroundX]);
+                        RevealTile(buttonMat[aroundP.Y, aroundP.X]);
                     });
                 }
             }
@@ -228,19 +234,18 @@ namespace MineMinesweeper
         {
             if (gameOn)
             {
-                int y = Grid.GetRow(b);
-                int x = Grid.GetColumn(b);
+                Point p = b.GetLocationInGrid();
                 if (firstClick)
                 {
                     firstClick = false;
-                    SetMat(x, y);
-                    OutMat();
+                    SetMat(p);
+                    //OutMat();
                 }
-                if (!revealedMat[y, x] && hintMat[y, x] == Hint.NOTHING)
+                if (!revealedMat[p.Y, p.X] && hintMat[p.Y, p.X] == Hint.NOTHING)
                 {
-                    revealedMat[y, x] = true;
-                    SetContent(b, mineMat[y, x]);
-                    switch (mineMat[y, x])
+                    revealedMat[p.Y, p.X] = true;
+                    SetContent(p);
+                    switch (mineMat[p.Y, p.X])
                     {
                         case -1:
                             {
@@ -250,9 +255,9 @@ namespace MineMinesweeper
                             }
                         case 0:
                             {
-                                DoAround(x, y, (aroundY, aroundX) =>
+                                DoAround(p, (aroundP) =>
                                 {
-                                    RevealTile(buttonMat[aroundY, aroundX]);
+                                    RevealTile(buttonMat[aroundP.Y, aroundP.X]);
                                 });
                                 break;
                             }
@@ -268,18 +273,19 @@ namespace MineMinesweeper
 
         private void ShowAllMines()
         {
-            for (int y = 0; y < matHeight; y++)
+            Point p = new Point(0, 0);
+            for (p.Y = 0; p.Y < matHeight; p.Y++)
             {
-                for (int x = 0; x < matWidth; x++)
+                for (p.X = 0; p.X < matWidth; p.X++)
                 {
-                    if (mineMat[y, x] == -1 && hintMat[y, x] != Hint.FLAG)
+                    if (HasMine(p) && hintMat[p.Y, p.X] != Hint.FLAG)
                     {
-                        SetContent(buttonMat[y, x], mineMat[y, x]);
+                        SetContent(p);
                     }
-                    if (mineMat[y, x] != -1 && hintMat[y, x] == Hint.FLAG)
+                    if (!HasMine(p) && hintMat[p.Y, p.X] == Hint.FLAG)
                     {
-                        SetContent(buttonMat[y, x], mineMat[y, x]);
-                        buttonMat[y, x].Background = Brushes.Red;
+                        SetContent(p);
+                        buttonMat[p.Y, p.X].Background = Brushes.Red;
                     }
                 }
             }
@@ -297,8 +303,10 @@ namespace MineMinesweeper
             }
         }
 
-        private void SetContent(Button b, int val)
+        private void SetContent(Point p)
         {
+            Button b = buttonMat[p.Y, p.X];
+            int val = mineMat[p.Y, p.X];
             b.Background = Brushes.White;
             switch (val)
             {
