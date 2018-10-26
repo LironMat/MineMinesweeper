@@ -1,0 +1,21 @@
+﻿<Window x:Class="MineMinesweeper.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MineMinesweeper"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="600" Width="600">
+    <Grid>
+        <Grid Height="568">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+            <Button Content="Easy" Grid.Row="0" Click="Button_Click"/>
+            <Button Content="Medium" Grid.Row="1" Click="Button_Click"/>
+            <Button Content="Hard" Grid.Row="2" Click="Button_Click"/>
+        </Grid>
+    </Grid>
+</Window>
