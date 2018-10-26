@@ -5,6 +5,26 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MineMinesweeper"
         mc:Ignorable="d"
-        Title="GameWindow" Height="450" Width="800">
-    <Grid Name="grid"></Grid>
+        Title="GameWindow" Height="450" Width="800" WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="100"/>
+        </Grid.RowDefinitions>
+        <Grid Name="grid" Grid.Row="0"></Grid>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal"  Grid.Column="0">
+                <TextBlock FontSize="30">Time:</TextBlock>
+                <TextBlock FontSize="30" Name="Time" Grid.Column="0">0</TextBlock>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Grid.Column="1">
+                <TextBlock FontSize="30">Mines:</TextBlock>   
+                <TextBlock FontSize="30" Name="Mines" Text="{Binding Path=ShownMines, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
 </Window>

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,13 +14,14 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace MineMinesweeper
 {
     /// <summary>
     /// Interaction logic for GameWindow.xaml
     /// </summary>
-    public partial class GameWindow : Window
+    public partial class GameWindow : Window, INotifyPropertyChanged
     {
         public enum Hint { NOTHING, FLAG, QUESTION };
         bool gameOn = true;
@@ -28,12 +30,26 @@ namespace MineMinesweeper
         bool[,] revealedMat;
         Button[,] buttonMat;
         Hint[,] hintMat;
-        int matHeight, matWidth, tileSize = 50, mines;
+        int matHeight, matWidth, tileSize = 50, mines, seconds;
+        int showMines;
+        DispatcherTimer timer;
+        public int ShownMines
+        {
+            get { return showMines; }
+
+            set
+            {
+                showMines = value;
+                OnPropertyChanged("ShownMines");
+            }
+        }
+
         bool firstClick = true;
         public GameWindow(int mines, int height, int width)
         {
             InitializeComponent();
-            this.mines = mines;
+            this.mines = ShownMines = mines;
+            Mines.DataContext = this;
             matHeight = height;
             matWidth = width;
             mineMat = new int[matHeight, matWidth];
@@ -42,6 +58,23 @@ namespace MineMinesweeper
             hintMat = new Hint[matHeight, matWidth];
             SetWindow();
             Show();
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(1);
+            timer.Tick += Timer_Tick;
+            timer.Start();
+        }
+
+        private void Timer_Tick(object sender, EventArgs e)
+        {
+            Time.Text = (++seconds).ToString();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public void OnPropertyChanged(string propertyName)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
         }
 
         private void SetMat(int firstX, int firstY)
@@ -75,7 +108,7 @@ namespace MineMinesweeper
             {
                 for (int aroundX = x - 1; aroundX < x + 2; aroundX++)
                 {
-                    if (aroundX >= 0 && aroundY >= 0 && aroundX < matWidth && aroundY < matHeight)
+                    if (InMat(aroundY, aroundX))
                     {
                         if (!(aroundX == x && aroundY == y))
                         {
@@ -86,13 +119,18 @@ namespace MineMinesweeper
             }
         }
 
+        private bool InMat(int y, int x)
+        {
+            return x >= 0 && y >= 0 && x < matWidth && y < matHeight;
+        }
+
         private IEnumerable<T> ReturnAround<T>(int x, int y, Func<int, int, T> func)
         {
             for (int aroundY = y - 1; aroundY < y + 2; aroundY++)
             {
                 for (int aroundX = x - 1; aroundX < x + 2; aroundX++)
                 {
-                    if (aroundX >= 0 && aroundY >= 0 && aroundX < matWidth && aroundY < matHeight)
+                    if (InMat(aroundY, aroundX))
                     {
                         if (!(aroundX == x && aroundY == y))
                         {
@@ -106,7 +144,7 @@ namespace MineMinesweeper
         private void SetWindow()
         {
             Width = matWidth * tileSize;
-            Height = matHeight * tileSize;
+            Height = matHeight * tileSize + 100;
             for (int x = 0; x < matWidth; x++)
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -157,12 +195,14 @@ namespace MineMinesweeper
             {
                 case null:
                     {
+                        ShownMines--;
                         b.Content = "F";
                         hint = Hint.FLAG;
                         break;
                     }
                 case "F":
                     {
+                        ShownMines++;
                         b.Content = "?";
                         hint = Hint.QUESTION;
                         break;
@@ -204,6 +244,7 @@ namespace MineMinesweeper
                     {
                         case -1:
                             {
+                                ShowAllMines();
                                 EndGame("You Lost!");
                                 break;
                             }
@@ -225,10 +266,30 @@ namespace MineMinesweeper
             }
         }
 
+        private void ShowAllMines()
+        {
+            for (int y = 0; y < matHeight; y++)
+            {
+                for (int x = 0; x < matWidth; x++)
+                {
+                    if (mineMat[y, x] == -1 && hintMat[y, x] != Hint.FLAG)
+                    {
+                        SetContent(buttonMat[y, x], mineMat[y, x]);
+                    }
+                    if (mineMat[y, x] != -1 && hintMat[y, x] == Hint.FLAG)
+                    {
+                        SetContent(buttonMat[y, x], mineMat[y, x]);
+                        buttonMat[y, x].Background = Brushes.Red;
+                    }
+                }
+            }
+        }
+
         private void EndGame(string message)
         {
             if (gameOn)
             {
+                timer.Stop();
                 gameOn = false;
                 MessageBox.Show(message);
                 new MainWindow().Show();
