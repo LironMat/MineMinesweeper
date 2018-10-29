@@ -24,19 +24,20 @@ namespace MineMinesweeper
     public partial class GameWindow : Window, INotifyPropertyChanged
     {
         public enum Hint { NOTHING, FLAG, QUESTION };
-        bool gameOn = true;
+        bool gameOn, firstClick;
         Random rnd = new Random();
+        DispatcherTimer timer;
         int[,] mineMat;
         bool[,] revealedMat;
         Button[,] buttonMat;
         Hint[,] hintMat;
-        int matHeight, matWidth, tileSize = 50, mines, seconds;
+        const int tileSize = 50;
+        int matHeight, matWidth, mines, seconds;
+
         int showMines;
-        DispatcherTimer timer;
         public int ShownMines
         {
             get { return showMines; }
-
             set
             {
                 showMines = value;
@@ -44,20 +45,31 @@ namespace MineMinesweeper
             }
         }
 
-        bool firstClick = true;
-        public GameWindow(int mines, int height, int width)
+        public GameWindow(int mines, int height, int width) : this(mines, height, width, true)
+        {
+        }
+
+        public GameWindow(int mines, int height, int width, bool firstClick)
         {
             InitializeComponent();
+            SetBoard(mines, height, width, firstClick);
+        }
+
+        private void SetBoard(int mines, int height, int width, bool firstClick)
+        {
+            gameOn = true;
+            this.firstClick = firstClick;
             this.mines = ShownMines = mines;
             Mines.DataContext = this;
             matHeight = height;
             matWidth = width;
-            mineMat = new int[matHeight, matWidth];
+            mineMat = (firstClick) ? new int[height, width] : mineMat;
             revealedMat = new bool[matHeight, matWidth];
             buttonMat = new Button[matHeight, matWidth];
             hintMat = new Hint[matHeight, matWidth];
             SetWindow();
             Show();
+            timer = new DispatcherTimer();
             timer = new DispatcherTimer();
             timer.Interval = TimeSpan.FromSeconds(1);
             timer.Tick += Timer_Tick;
@@ -79,7 +91,7 @@ namespace MineMinesweeper
 
         private void SetMat(Point firstP)
         {
-            for (int i = 0; i < this.mines; i++)
+            for (int i = 0; i < mines; i++)
             {
                 Point rndP = new Point(rnd.Next(matWidth), rnd.Next(matHeight));
                 if (!HasMine(rndP) && !firstP.Equals(rndP))
@@ -141,15 +153,17 @@ namespace MineMinesweeper
                 }
             }
         }
+
         private bool InMat(Point p)
         {
             return p.X >= 0 && p.Y >= 0 && p.X < matWidth && p.Y < matHeight;
         }
 
-
-
         private void SetWindow()
         {
+            grid.Children.Clear();
+            grid.RowDefinitions.Clear();
+            grid.ColumnDefinitions.Clear();
             Width = matWidth * tileSize;
             Height = matHeight * tileSize + 100;
             for (int x = 0; x < matWidth; x++)
@@ -174,6 +188,8 @@ namespace MineMinesweeper
 
         private void B_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            e.Handled = true;
+            File.AppendAllText("lol.txt", "LOOOOOOOOOOOOOOL" + Environment.NewLine);
             Button b = sender as Button;
             Point p = b.GetLocationInGrid();
             if (revealedMat[p.Y, p.X])
@@ -185,12 +201,21 @@ namespace MineMinesweeper
 
                 if (flagCount == mineMat[p.Y, p.X])
                 {
-                    DoAround(p, (aroundP) =>
+                    if (RevealAround(p))
                     {
-                        RevealTile(buttonMat[aroundP.Y, aroundP.X]);
-                    });
+                        LoseGame();
+                    }
                 }
             }
+            CheckWin();
+        }
+
+        private bool RevealAround(Point p)
+        {
+            return ReturnAround(p, (aroundP) =>
+            {
+                return RevealTile(buttonMat[aroundP.Y, aroundP.X]);
+            }).Aggregate((b1, b2) => b1 || b2);
         }
 
         private void FlagClick(object sender, MouseButtonEventArgs e)
@@ -220,18 +245,37 @@ namespace MineMinesweeper
                         break;
                     }
             }
-            int y = Grid.GetRow(b);
-            int x = Grid.GetColumn(b);
-            hintMat[y, x] = hint;
+            Point p = b.GetLocationInGrid();
+            hintMat[p.Y, p.X] = hint;
         }
 
         private void TileClick(object sender, RoutedEventArgs e)
         {
-            RevealTile((Button)sender);
+            File.AppendAllText("lol.txt", "XDDDDDDDDDDDDDD" + Environment.NewLine);
+            if (RevealTile((Button)sender))
+            {
+                LoseGame();
+            }
+            CheckWin();
         }
 
-        private void RevealTile(Button b)
+        private void CheckWin()
         {
+            if (revealedMat.Cast<bool>().ToList().Count(f => !f) == mines)
+            {
+                EndGame("You Won!", MessageBoxButton.OKCancel);
+            }
+        }
+
+        private void LoseGame()
+        {
+            ShowAllMines();
+            EndGame("You Lost!", MessageBoxButton.YesNoCancel);
+        }
+
+        private bool RevealTile(Button b)
+        {
+            var res = false;
             if (gameOn)
             {
                 Point p = b.GetLocationInGrid();
@@ -249,26 +293,17 @@ namespace MineMinesweeper
                     {
                         case -1:
                             {
-                                ShowAllMines();
-                                EndGame("You Lost!");
-                                break;
+                                return true;
                             }
                         case 0:
                             {
-                                DoAround(p, (aroundP) =>
-                                {
-                                    RevealTile(buttonMat[aroundP.Y, aroundP.X]);
-                                });
-                                break;
+                                return RevealAround(p);
                             }
 
                     }
-                    if (revealedMat.Cast<bool>().ToList().Count(f => !f) == this.mines)
-                    {
-                        EndGame("You Won!");
-                    }
                 }
             }
+            return false;
         }
 
         private void ShowAllMines()
@@ -291,15 +326,33 @@ namespace MineMinesweeper
             }
         }
 
-        private void EndGame(string message)
+        private void EndGame(string message, MessageBoxButton boxButton)
         {
             if (gameOn)
             {
                 timer.Stop();
                 gameOn = false;
-                MessageBox.Show(message);
-                new MainWindow().Show();
-                Close();
+                bool isOk = boxButton == MessageBoxButton.OKCancel;
+                switch (MessageBox.Show($"Press {((isOk) ? "OK" : "Yes")} to start a new game,\n{((isOk) ? "" : "No to start the same game")}\nOr Cancel to go back to the menu", message, boxButton))
+                {
+                    case MessageBoxResult.OK:
+                    case MessageBoxResult.Yes:
+                        {
+                            SetBoard(mines, matHeight, matWidth, true);
+                            break;
+                        }
+                    case MessageBoxResult.No:
+                        {
+                            SetBoard(mines, matHeight, matWidth, false);
+                            break;
+                        }
+                    case MessageBoxResult.Cancel:
+                        {
+                            new MainWindow().Show();
+                            Close();
+                            break;
+                        }
+                }
             }
         }
 
