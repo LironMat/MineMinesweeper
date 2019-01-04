@@ -189,7 +189,6 @@ namespace MineMinesweeper
         private void B_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             e.Handled = true;
-            File.AppendAllText("lol.txt", "LOOOOOOOOOOOOOOL" + Environment.NewLine);
             Button b = sender as Button;
             Point p = b.GetLocationInGrid();
             if (revealedMat[p.Y, p.X])
